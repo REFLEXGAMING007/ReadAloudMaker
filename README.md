@@ -10,6 +10,7 @@ Put the files in a folder, double-click `run.bat` (Windows) or run `./run.sh`
 ![Python](https://img.shields.io/badge/python-3.9-blue)
 ![EPUB](https://img.shields.io/badge/EPUB-3-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+[![tests](https://github.com/REFLEXGAMING007/ReadAloudMaker/actions/workflows/tests.yml/badge.svg)](https://github.com/REFLEXGAMING007/ReadAloudMaker/actions/workflows/tests.yml)
 
 ---
 
