@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tool output and scratch data
+_readaloud_work/
+output/
+out/
+
+# Never commit books or audio: this repository is code only.
+*.epub
+*.mobi
+*.azw3
+*.mp3
+*.m4a
+*.m4b
+*.wav
+*.ogg
+*.flac
+*.aac
+*.opus
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

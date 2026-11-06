@@ -1,0 +1,23 @@
+# Python packages used by ReadAloudMaker.
+#
+# aeneas does the forced alignment; syncabook packages the EPUB3 with Media
+# Overlays. Only those two top-level packages are pinned here because they
+# install their own dependencies automatically:
+#
+#   aeneas    -> BeautifulSoup4, lxml, numpy
+#   syncabook -> beautifulsoup4, Jinja2, lxml, progressbar2
+#
+# lxml is therefore NOT missing: it is a hard dependency of BOTH packages and
+# `pip install -r requirements.txt` installs it. Do not add it separately --
+# a duplicate pin here could conflict with the version aeneas/syncabook expect.
+#
+# System programs are NOT installed by pip. You still need:
+#   - FFmpeg + ffprobe   (audio conversion, duration probing)
+#   - eSpeak NG          (speech synthesis used by aeneas)
+# See README.md for installation links.
+#
+# Use Python 3.9: aeneas 1.7.3 ships prebuilt C extensions for it. Newer
+# Python versions often fail to build aeneas.cdtw / cmfcc / cew.
+
+aeneas==1.7.3
+syncabook==0.2.0

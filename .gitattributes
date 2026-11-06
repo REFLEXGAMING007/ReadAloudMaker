@@ -1,0 +1,10 @@
+# Normalize line endings so the launchers behave on their target platforms.
+* text=auto
+
+*.py   text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sh   text eol=lf
+*.bat  text eol=crlf
