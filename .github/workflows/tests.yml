@@ -12,7 +12,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # ubuntu-22.04 is pinned because actions/setup-python does not provide
+        # Python 3.9 for ubuntu-latest (26.04); aeneas 1.7.3 needs 3.9.
+        os: [ubuntu-22.04, windows-latest]
         python-version: ["3.9"]
 
     steps:
