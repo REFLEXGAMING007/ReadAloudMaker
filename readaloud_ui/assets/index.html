@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>ReadAloudMaker — EPUB made audible</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="aurora" aria-hidden="true">
+    <span class="blob b1"></span>
+    <span class="blob b2"></span>
+    <span class="blob b3"></span>
+    <span class="grain"></span>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none">
+          <path d="M5 9.5v13M10 6.5v19M15 11v10M20 4.5v23M25 9v14M30 12v8"
+                stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-copy">
+        <strong>ReadAloudMaker</strong>
+        <small>EPUB 3 · media overlays</small>
+      </span>
+    </a>
+    <div class="topbar-actions">
+      <span class="host-pill" id="hostPill"><i></i> local · 9459</span>
+      <button type="button" class="ghost" id="helpBtn">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.2" stroke="currentColor" stroke-width="1.5"/><path d="M7.9 7.6a2.15 2.15 0 0 1 4.2.7c0 1.4-2.1 1.7-2.1 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14" r=".9" fill="currentColor"/></svg>
+        How it works
+      </button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="intro">
+      <h1>Turn a book into a <span class="grad">read-aloud</span> experience.</h1>
+      <p>Drop one EPUB and one audio file per chapter. Get an EPUB 3 with
+        word-accurate media overlays, ready for Thorium Reader.</p>
+    </section>
+
+    <div class="grid">
+      <section class="panel config-panel" aria-labelledby="buildHeading">
+        <div class="panel-head">
+          <div>
+            <h2 id="buildHeading">Build a book</h2>
+            <p>Everything stays on this computer.</p>
+          </div>
+          <span class="mini-pill" id="enginePill">—</span>
+        </div>
+
+        <form id="buildForm" novalidate>
+          <div class="field">
+            <span class="field-label">Alignment engine</span>
+            <div class="engines" id="engines" role="radiogroup" aria-label="Alignment engine">
+              <div class="engine-skeleton"></div>
+              <div class="engine-skeleton"></div>
+            </div>
+            <p class="hint" id="engineHint">Detecting what this machine can run…</p>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="folder">Source folder</label>
+            <div class="folder-row">
+              <span class="input-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M2.8 6.2A1.7 1.7 0 0 1 4.5 4.5h3l1.5 1.7h6.5a1.7 1.7 0 0 1 1.7 1.7v6.4a1.7 1.7 0 0 1-1.7 1.7h-11a1.7 1.7 0 0 1-1.7-1.7V6.2Z" stroke="currentColor" stroke-width="1.5"/></svg>
+              </span>
+              <input id="folder" name="folder" type="text" spellcheck="false"
+                     autocomplete="off" placeholder="C:\books\my book">
+              <button type="button" class="ghost accent" id="scanBtn">Scan</button>
+            </div>
+            <div class="dropzone" id="dropzone" tabindex="0" role="button"
+                 aria-label="Drop the EPUB and audio files here">
+              <div class="drop-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 15.5v2A2.5 2.5 0 0 0 7 20h10a2.5 2.5 0 0 0 2.5-2.5v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </div>
+              <div class="drop-copy">
+                <strong>Drop the EPUB + chapter audio here</strong>
+                <span>or type a folder above · mp3, m4a, m4b, wav, ogg, flac, aac, opus</span>
+              </div>
+              <button type="button" class="ghost small" id="browseBtn">Choose files</button>
+              <input type="file" id="fileInput" multiple hidden
+                     accept=".epub,.mp3,.m4a,.m4b,.wav,.ogg,.flac,.aac,.opus">
+            </div>
+            <div class="upload-status" id="uploadStatus" hidden>
+              <span class="spinner"></span><span id="uploadText">Uploading…</span>
+            </div>
+          </div>
+
+          <div class="scan-card" id="scanCard" hidden>
+            <div class="scan-head">
+              <div class="scan-title">
+                <span class="scan-badge" id="scanBadge">Ready</span>
+                <strong id="scanTitle">Book</strong>
+                <span class="scan-sub" id="scanSub"></span>
+              </div>
+              <button type="button" class="icon-btn" id="rescanBtn" title="Scan again" aria-label="Scan again">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M15.6 8.2A6 6 0 1 0 16 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15.9 4.6v3.9h-3.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+            <div class="scan-stats" id="scanStats"></div>
+            <div class="scan-warnings" id="scanWarnings" hidden></div>
+            <label class="select-row" id="epubRow" hidden>
+              <span>EPUB</span>
+              <select id="epubSelect"></select>
+            </label>
+          </div>
+
+          <details class="advanced" id="advanced">
+            <summary>
+              <span>Advanced settings</span>
+              <span class="summary-tag" id="advancedTag">auto</span>
+            </summary>
+            <div class="advanced-body">
+              <div class="field">
+                <label class="field-label" for="out">Output folder <em>optional</em></label>
+                <input id="out" type="text" spellcheck="false" autocomplete="off"
+                       placeholder="defaults to &lt;source&gt;\output">
+              </div>
+
+              <div class="grid2">
+                <div class="field">
+                  <label class="field-label" for="language">Language</label>
+                  <input id="language" type="text" spellcheck="false"
+                         placeholder="from the EPUB (e.g. English, eng)">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="exclude">Exclude documents</label>
+                  <input id="exclude" type="text" spellcheck="false"
+                         placeholder="regex (cover, nav, titlepage …)">
+                </div>
+              </div>
+
+              <div id="qwenOptions" class="engine-options">
+                <div class="grid2">
+                  <div class="field">
+                    <label class="field-label" for="maxChunk">
+                      Alignment pass <em id="maxChunkValue">150 s</em>
+                    </label>
+                    <input id="maxChunk" type="range" min="30" max="170" step="10" value="150">
+                    <p class="hint">Shorter passes use less VRAM. 150 s is a good default.</p>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="minCoverage">
+                      Minimum coverage <em id="minCoverageValue">98%</em>
+                    </label>
+                    <input id="minCoverage" type="range" min="80" max="100" step="1" value="98">
+                    <p class="hint">Stop if less of the text can be matched to the audio.</p>
+                  </div>
+                </div>
+                <div class="grid3">
+                  <div class="field">
+                    <label class="field-label" for="device">Device</label>
+                    <select id="device">
+                      <option value="auto">auto</option>
+                      <option value="cuda:0">cuda:0</option>
+                      <option value="cuda:1">cuda:1</option>
+                      <option value="cpu">cpu</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="dtype">Precision</label>
+                    <select id="dtype">
+                      <option value="auto">auto</option>
+                      <option value="bfloat16">bfloat16</option>
+                      <option value="float16">float16</option>
+                      <option value="float32">float32</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="model">Model</label>
+                    <input id="model" type="text" spellcheck="false"
+                           value="Qwen/Qwen3-ForcedAligner-0.6B">
+                  </div>
+                </div>
+                <div class="checks">
+                  <label class="check"><input type="checkbox" id="dryRun">
+                    <span><strong>Dry run</strong><em>Plan only, no model</em></span></label>
+                  <label class="check"><input type="checkbox" id="fakeAligner">
+                    <span><strong>Fake aligner</strong><em>Test the packager</em></span></label>
+                  <label class="check"><input type="checkbox" id="compileModel">
+                    <span><strong>torch.compile</strong><em>Faster after warm-up</em></span></label>
+                  <label class="check"><input type="checkbox" id="epubcheck">
+                    <span><strong>EPUBCheck</strong><em>If installed on PATH</em></span></label>
+                </div>
+              </div>
+
+              <div id="classicOptions" class="engine-options" hidden>
+                <div class="grid2">
+                  <div class="field">
+                    <label class="field-label" for="title">Title override</label>
+                    <input id="title" type="text" placeholder="from the EPUB">
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="author">Author override</label>
+                    <input id="author" type="text" placeholder="from the EPUB">
+                  </div>
+                </div>
+                <label class="check"><input type="checkbox" id="prepareOnly">
+                  <span><strong>Prepare only</strong><em>Stop before alignment</em></span></label>
+              </div>
+
+              <label class="check"><input type="checkbox" id="keepWork">
+                <span><strong>Keep work folder</strong><em>Inspect generated files</em></span></label>
+            </div>
+          </details>
+
+          <div class="runbar">
+            <div class="run-meta">
+              <span class="run-engine" id="runEngine">Qwen3 · word-level</span>
+              <span class="run-out" id="runOut">output/</span>
+            </div>
+            <div class="run-actions">
+              <button type="button" class="ghost danger" id="cancelBtn" hidden>Cancel</button>
+              <button type="submit" class="primary" id="runBtn">
+                <span class="btn-label">Build EPUB</span>
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10h12M11 4.5 16.5 10 11 15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel progress-panel" aria-labelledby="progressHeading">
+        <div class="panel-head">
+          <div>
+            <h2 id="progressHeading">Progress</h2>
+            <p>Live output from the alignment pipeline.</p>
+          </div>
+          <span class="status-pill idle" id="statusPill">Idle</span>
+        </div>
+
+        <div class="progress-hero">
+          <div class="ring" id="ring" aria-hidden="true">
+            <svg viewBox="0 0 120 120">
+              <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+              <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="52"></circle>
+            </svg>
+            <div class="ring-label"><strong id="percent">0%</strong><span>complete</span></div>
+          </div>
+          <div class="progress-copy">
+            <strong id="stageLabel">Waiting for a build</strong>
+            <span id="stageDetail">Pick an engine and press Build EPUB.</span>
+            <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                 aria-valuenow="0" id="bar"><i id="barFill"></i></div>
+            <span class="elapsed" id="elapsed">—</span>
+          </div>
+        </div>
+
+        <ol class="steps" id="steps">
+          <li data-stage="prepare"><span class="dot"></span><span>Prepare</span></li>
+          <li data-stage="align"><span class="dot"></span><span>Align</span></li>
+          <li data-stage="package"><span class="dot"></span><span>Package</span></li>
+          <li data-stage="check"><span class="dot"></span><span>Validate</span></li>
+        </ol>
+
+        <div class="log-head">
+          <h3>Live log</h3>
+          <label class="switch" title="libmpg123 prints warnings for MP3 frames it conceals">
+            <input type="checkbox" id="showNoise">
+            <span></span>
+            decoder noise
+          </label>
+          <button type="button" class="ghost small" id="copyLog">Copy</button>
+        </div>
+        <div class="log hide-noise" id="log" aria-live="polite" aria-label="Build log">
+          <div class="log-empty" id="logEmpty">
+            <span class="pulse-dot"></span>
+            The build log appears here.
+          </div>
+        </div>
+
+        <div class="result" id="result" hidden>
+          <div class="result-icon" id="resultIcon"></div>
+          <div class="result-copy">
+            <strong id="resultTitle">Book ready</strong>
+            <span id="resultSub"></span>
+            <div class="result-stats" id="resultStats"></div>
+          </div>
+          <div class="result-actions">
+            <a class="primary small" id="downloadBtn" href="#" download>Download EPUB</a>
+            <button type="button" class="ghost small" id="revealBtn">Open folder</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <span>v2 pipeline · Qwen3-ForcedAligner-0.6B + built-in packager</span>
+      <span id="footEngine">classic pipeline available for compatibility</span>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="helpDialog" class="help-dialog">
+    <form method="dialog" class="help-close-form">
+      <button class="icon-btn" aria-label="Close" value="close">
+        <svg viewBox="0 0 20 20" fill="none"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
+    </form>
+    <h2>How ReadAloudMaker works</h2>
+    <p class="help-lead">One folder, one EPUB, one audio file per chapter. The
+      engine finds where every sentence is spoken and writes EPUB 3 media
+      overlays so your reader can highlight the text while it plays.</p>
+
+    <div class="help-grid">
+      <article>
+        <h3>Qwen3 Forced Aligner <span class="tag violet">recommended</span></h3>
+        <p>Qwen3-ForcedAligner-0.6B predicts a timestamp for every word. The
+          packager copies the original EPUB byte for byte and only adds the
+          audio, SMIL overlays and manifest entries.</p>
+        <ul>
+          <li>~32–43 ms average alignment error (model card)</li>
+          <li>Needs Python 3.12 + PyTorch + <code>requirements-qwen.txt</code></li>
+          <li>GPU strongly recommended; CPU works but is slow</li>
+        </ul>
+      </article>
+      <article>
+        <h3>Classic <span class="tag">compatibility</span></h3>
+        <p>The original aeneas + syncabook pipeline. It synthesizes each
+          fragment with eSpeak NG and aligns the audio features, then lets
+          syncabook rebuild the EPUB.</p>
+        <ul>
+          <li>Needs Python 3.9, aeneas, syncabook, FFmpeg, eSpeak NG</li>
+          <li>Useful when the Qwen environment is not installed</li>
+        </ul>
+      </article>
+    </div>
+
+    <h3>If an engine says “setup needed”</h3>
+    <pre id="setupSnippet">Qwen3:
+  py -3.12 -m venv .venv-qwen
+  .venv-qwen\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+  .venv-qwen\Scripts\python.exe -m pip install -r requirements-qwen.txt
+
+Classic:
+  py -3.9 -m pip install -r requirements.txt
+  install FFmpeg and eSpeak NG, then add both to PATH</pre>
+
+    <p class="help-foot">Both engines write <code>output/&lt;title&gt;_readaloud.epub</code>.
+      Open it in Thorium Reader to hear the narration with live highlighting.</p>
+  </dialog>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>

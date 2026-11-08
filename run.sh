@@ -1,19 +1,28 @@
 #!/usr/bin/env bash
 #
-# Launcher for Linux and macOS. On Windows use run.bat instead.
+# One launcher for both pipelines.
 #
-#   ./run.sh [options]
+#   ./run.sh                    web UI on http://127.0.0.1:9459
+#   ./run.sh --ui [options]     same, explicitly
+#   ./run.sh --v1 [options]     classic aeneas + syncabook (CLI)
+#   ./run.sh --v2 [options]     Qwen3-ForcedAligner (CLI)
 #
-# Options are passed straight to make_readaloud.py (see --help).
+# run.py picks the interpreter that actually has the requested engine, so the
+# only job here is to find some Python 3.9+ and hand over.
 
 set -u
 cd "$(dirname "$0")" || exit 1
 export PYTHONIOENCODING=utf-8
 
 PY=""
-for candidate in python3.9 python3 python; do
+for candidate in ".venv-qwen/bin/python" python3.12 python3.11 python3.10 \
+                 python3.9 python3 python; do
+    if [ -x "$candidate" ]; then
+        PY="$candidate"
+        break
+    fi
     if command -v "$candidate" >/dev/null 2>&1 &&
-       "$candidate" -c "import aeneas" >/dev/null 2>&1; then
+       "$candidate" -c "import sys" >/dev/null 2>&1; then
         PY="$candidate"
         break
     fi
@@ -22,9 +31,9 @@ done
 if [ -z "$PY" ]; then
     cat <<'EOF'
 
-ERROR: no Python with the required packages was found.
+ERROR: no Python was found.
 
-  1. Install Python 3.9 (aeneas 1.7.3 needs it).
+  1. Install Python 3.9 (classic pipeline) and/or Python 3.12 (Qwen3).
   2. Run:  python3 -m pip install -r requirements.txt
   3. Install FFmpeg and eSpeak NG (see README.md).
 
@@ -32,17 +41,4 @@ EOF
     exit 1
 fi
 
-"$PY" make_readaloud.py "$@"
-status=$?
-
-echo
-if [ "$status" -eq 0 ]; then
-    echo 'Finished. The read-aloud EPUB is in the "output" folder.'
-else
-    echo "Something went wrong. Read the messages above."
-    if [ -d _readaloud_work ]; then
-        echo "The _readaloud_work folder was kept so the generated files can be inspected."
-    fi
-fi
-
-exit "$status"
+exec "$PY" run.py "$@"

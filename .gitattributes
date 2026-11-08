@@ -1,5 +1,6 @@
 # Normalize line endings so the launchers behave on their target platforms.
 * text=auto
+.gitattributes text eol=lf
 
 *.py   text eol=lf
 *.md   text eol=lf
@@ -8,3 +9,7 @@
 *.yaml text eol=lf
 *.sh   text eol=lf
 *.bat  text eol=crlf
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.svg  text eol=lf

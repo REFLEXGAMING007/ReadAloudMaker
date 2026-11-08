@@ -10,7 +10,7 @@ from .errors import PipelineError
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        prog="run2",
+        prog="run --v2",
         description=(
             "Build an EPUB 3 with Media Overlays using Qwen3-ForcedAligner. "
             "Existing EPUB formatting and assets are preserved."
@@ -18,10 +18,10 @@ def build_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  run2 --folder .\n"
-            "  run2 --folder . --dry-run\n"
-            "  run2 --folder . --lang en --device cuda:0\n"
-            "  run2 --folder . --exclude \"(?i)(nav|cover)\"\n"
+            "  run.bat --v2 --folder .\n"
+            "  run.bat --v2 --folder . --dry-run\n"
+            "  run.bat --v2 --folder . --lang en --device cuda:0\n"
+            "  run.bat --v2 --folder . --exclude \"(?i)(nav|cover)\"\n"
         ),
     )
     parser.add_argument(

@@ -4,14 +4,22 @@ Turn **one EPUB** plus **one audio file per chapter** into an **EPUB 3 with Medi
 Overlays** — the "read-aloud" format where the text is highlighted as the
 narration plays.
 
-Put the files in a folder, double-click `run.bat` (Windows) or run `./run.sh`
-(Linux/macOS), and get `output/<book title>_readaloud.epub`.
+Double-click `run.bat` (Windows) or run `./run.sh` (Linux/macOS) and the
+**local web UI** opens on <http://127.0.0.1:9459>. Pick a folder, choose an
+engine, press **Build EPUB**, and download `output/<book title>_readaloud.epub`.
 
-> **Two pipelines.** `run.bat` / `run.sh` keep the original aeneas + syncabook
-> pipeline. `run2.bat` / `run2.sh` use **Qwen3-ForcedAligner-0.6B** and a
-> built-in EPUB packager instead. The second pipeline is independent, needs
-> Python 3.12 + PyTorch, and is documented in
-> [docs/QWEN3_PIPELINE.md](docs/QWEN3_PIPELINE.md).
+> **One launcher, two pipelines.** `run.bat` / `run.sh` open the UI by default.
+> The same command can still drive either engine from a terminal:
+>
+> | Command | What it does |
+> |---|---|
+> | `run.bat` | Web UI on `http://127.0.0.1:9459` |
+> | `run.bat --v1 …` | Original **aeneas + syncabook** pipeline (CLI) |
+> | `run.bat --v2 …` | **Qwen3-ForcedAligner-0.6B** pipeline (CLI) |
+>
+> The Qwen3 engine needs Python 3.12 + PyTorch and is documented in
+> [docs/QWEN3_PIPELINE.md](docs/QWEN3_PIPELINE.md). The UI detects which
+> engines are installed and only enables the ones that can actually run.
 
 ![Python](https://img.shields.io/badge/python-3.9-blue)
 ![EPUB](https://img.shields.io/badge/EPUB-3-green)
@@ -158,6 +166,17 @@ syncabook -h
    If the executable bit was lost (common when downloading a ZIP), run
    `chmod +x run.sh` once, or use `bash run.sh`.
 
+   Your browser opens the **ReadAloudMaker UI** on
+   <http://127.0.0.1:9459>. It shows the detected engines, lets you drag the
+   EPUB and audio straight onto the page, previews the chapters and audio
+   pairing, and streams the build log. If the browser does not open by itself,
+   visit the URL manually. Add `--no-browser` to keep the console quiet, or
+   `--port 9600` to move it.
+
+   Prefer the terminal? `run.bat --v1 --folder "C:\books\my book"` (or
+   `./run.sh --v1 --folder "/books/my book"`) runs the classic pipeline
+   directly, with the options listed below.
+
 4. Open `output/<book title>_readaloud.epub` in a reader that supports Media
    Overlays. **Thorium Reader** is the easiest choice on Windows, Linux and
    macOS. Press play and the current sentence is highlighted.
@@ -169,7 +188,7 @@ syncabook -h
 ### Test without waiting for alignment
 
 ```bash
-./run.sh --prepare-only
+./run.sh --v1 --prepare-only
 ```
 
 This unpacks the EPUB, injects IDs, copies/converts the audio, writes the
@@ -179,22 +198,27 @@ audio list, so it is the fastest way to check that the pairing is right. The
 
 ## Qwen3 pipeline (v2)
 
-The second launcher is independent of aeneas and syncabook:
+The second pipeline is independent of aeneas and syncabook. Set it up once:
 
 ```bat
 py -3.12 -m venv .venv-qwen
 .venv-qwen\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu124
 .venv-qwen\Scripts\python.exe -m pip install -r requirements-qwen.txt
-run2.bat --folder "C:\books\my book" --dry-run
-run2.bat --folder "C:\books\my book"
+```
+
+Then use it from either the UI (choose **Qwen3 Forced Aligner**) or the CLI:
+
+```bat
+run.bat --v2 --folder "C:\books\my book" --dry-run
+run.bat --v2 --folder "C:\books\my book"
 ```
 
 ```bash
 python3.12 -m venv .venv-qwen
 .venv-qwen/bin/pip install torch
 .venv-qwen/bin/pip install -r requirements-qwen.txt
-./run2.sh --folder "/books/my book" --dry-run
-./run2.sh --folder "/books/my book"
+./run.sh --v2 --folder "/books/my book" --dry-run
+./run.sh --v2 --folder "/books/my book"
 ```
 
 `--dry-run` needs only `lxml` and FFmpeg: it parses the EPUB, plans alignment
@@ -204,6 +228,32 @@ for checking the packager on a machine without a GPU.
 
 See [docs/QWEN3_PIPELINE.md](docs/QWEN3_PIPELINE.md) for requirements,
 options, accuracy details and GPU memory tips.
+
+---
+
+## Web UI
+
+The UI is served by the same repository, uses only the Python standard library,
+and never leaves this computer.
+
+- **Engine cards** show which pipelines are ready. Detection asks each Python
+  interpreter whether `aeneas`, `lxml`, `torch` and `qwen_asr` *exist*; it does
+  not import torch, so the page opens in about a second.
+- **Scan** reads the EPUB spine and lists the chapter count, sentence count and
+  audio files before anything is built, and warns when the counts do not match.
+- **Drag and drop** copies the EPUB and audio into a temporary folder
+  (`%TEMP%\readaloud-ui-…`) and points the build at it. Nothing is written next
+  to your original files.
+- **Progress** is a ring plus four stages (prepare → align → package →
+  validate), fed by the build's own log. MP3 decoder noise is tagged and hidden
+  behind the *decoder noise* switch.
+- **Cancel**, **Download EPUB** and **Open folder** all work from the result
+  card.
+
+The server binds `127.0.0.1` only and rejects requests whose `Host` or `Origin`
+is not local. Two interpreters can coexist: `run.bat` prefers `.venv-qwen`
+because the scan preview needs `lxml`, then falls back to `py -3.12/3.11/3.9`
+and `python`. The UI itself works on Python 3.9+.
 
 ---
 
@@ -240,16 +290,38 @@ exclude it with `--exclude`.
 
 ## Command-line options
 
-Both launchers pass options through:
+`run.bat` / `run.sh` are dispatchers. The first argument picks the mode:
+
+| Argument | Mode |
+|---|---|
+| *(none)* or `--ui` | Web UI on `http://127.0.0.1:9459` |
+| `--v1` | Classic aeneas + syncabook pipeline |
+| `--v2` | Qwen3-ForcedAligner pipeline (see [docs/QWEN3_PIPELINE.md](docs/QWEN3_PIPELINE.md)) |
+
+### UI options
+
+| Option | Meaning |
+|---|---|
+| `--port N` | Port to listen on (default: `9459`). |
+| `--host ADDR` | Bind address (default: `127.0.0.1`, this computer only). |
+| `--no-browser` | Do not open a browser window. |
+| `--version` | Print the UI version. |
+
+If the UI is already running on the port, launching it again just prints the
+URL and exits instead of starting a second server.
+
+### Classic pipeline options
+
+These follow `--v1`:
 
 ```bat
-run.bat --lang eng
-run.bat --title "My Book" --author "Author Name"
+run.bat --v1 --lang eng
+run.bat --v1 --title "My Book" --author "Author Name"
 ```
 
 ```bash
-./run.sh --lang eng
-./run.sh --title "My Book" --author "Author Name"
+./run.sh --v1 --lang eng
+./run.sh --v1 --title "My Book" --author "Author Name"
 ```
 
 | Option | Meaning |
@@ -338,7 +410,7 @@ On success the folder is deleted (unless `--keep-work` is given).
 | `more than one .epub found` | Keep only the book you want, or pass `--epub`. |
 | `There must be exactly one audio file per chapter` | Read the two printed lists. Rename, move or add the audio so the counts match. |
 | `alignment failed on chapter N` | The audio for that chapter does not match its text, is silent, or the language is wrong. Check the order, then try `--lang eng`/`deu`/… |
-| `aeneas is not installed for this Python` | The launcher picked the wrong Python. Install requirements for 3.9: `py -3.9 -m pip install -r requirements.txt`. |
+| `aeneas is not installed for this Python` | The dispatcher could not find a Python with aeneas. Install requirements for 3.9: `py -3.9 -m pip install -r requirements.txt`, then check `run.bat --v1 --help`. |
 | `missing required program(s): ffmpeg, ffprobe` | Install FFmpeg and make sure `ffmpeg -version` works in a new terminal. |
 | `missing required program(s): espeak-ng` | Install eSpeak NG and add it to `PATH`. |
 | `syncabook was not found` | `python3.9 -m pip install -r requirements.txt`. |
@@ -347,6 +419,9 @@ On success the folder is deleted (unless `--keep-work` is given).
 | A few paragraphs highlight instantly | They are punctuation-only fragments (`“…”`, `[…]`). Expected. |
 | Alignment is slow | Expected: aeneas synthesizes every fragment with eSpeak and then aligns audio features. A 39-minute sample took about 15–25 s on the development machine; a full-length audiobook can take several minutes. It is CPU-bound and scales roughly with the amount of audio. |
 | `generated content.opf is not valid UTF-8` | You are running an old copy of `syncabook` whose default encoding is not UTF-8, or `PYTHONUTF8` was overridden. Update the tool and reinstall `requirements.txt`. |
+| UI says `ReadAloudMaker UI is already running` | That is expected: the port is taken by the running instance. Open the printed URL, or start another copy with `--port 9600`. |
+| UI port 9459 is used by something else | `run.bat --ui --port 9600`, or close the other program. |
+| UI shows *setup* on an engine | Hover the engine card, or open **How it works** for the exact `pip` commands and missing pieces. |
 
 ### Why Python 3.9?
 
@@ -373,8 +448,9 @@ tool (venv, pyenv, or `py -3.9`).
 
 ## Development
 
-The script uses only the Python standard library at import time; external tools
-are only needed when you actually build a book. That means the unit tests run
+The UI (`readaloud_ui/`) uses only the Python standard library, and
+`make_readaloud.py` imports only the standard library at module load. External
+tools are needed only when you actually build a book, so the unit tests run
 without aeneas, FFmpeg or eSpeak installed:
 
 ```bash
@@ -382,8 +458,9 @@ python3 -m unittest discover -s tests -v
 ```
 
 Tests cover ID injection, natural sorting, title sanitising, SMIL clock parsing,
-EPUB reading, SMIL/text/audio reference validation, and a full `--prepare-only`
-run on a synthetic EPUB.
+EPUB reading, SMIL/text/audio reference validation, a full `--prepare-only` run
+on a synthetic EPUB, the Qwen3 packager, and the UI (job commands, progress and
+log parsing, cancel, HTTP routes, uploads, localhost guards).
 
 Pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 

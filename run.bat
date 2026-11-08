@@ -5,39 +5,57 @@ cd /d "%~dp0"
 set "PYTHONIOENCODING=utf-8"
 title ReadAloudMaker
 
-echo.
-echo ============================================
-echo   EPUB + audio  ->  read-aloud EPUB3
-echo ============================================
-echo.
+rem ---------------------------------------------------------------
+rem  One launcher for both pipelines.
+rem
+rem    run.bat                     web UI on http://127.0.0.1:9459
+rem    run.bat --ui [options]      same, explicitly
+rem    run.bat --v1 [options]      classic aeneas + syncabook (CLI)
+rem    run.bat --v2 [options]      Qwen3-ForcedAligner (CLI)
+rem ---------------------------------------------------------------
 
 set "PYEXE="
 set "PYARGS="
 
-rem Prefer the Python launcher pinned to 3.9 (the version aeneas supports).
-py -3.9 -c "import aeneas" >nul 2>&1
-if not errorlevel 1 goto :use_py39
+rem Prefer the Qwen environment: it also has lxml for the UI preview.
+if exist "%~dp0.venv-qwen\Scripts\python.exe" (
+    set "PYEXE=%~dp0.venv-qwen\Scripts\python.exe"
+    goto :run
+)
 
-rem Fall back to a normal Python 3.9 install in the default location.
-if not exist "C:\Program Files\Python39\python.exe" goto :try_python
-"C:\Program Files\Python39\python.exe" -c "import aeneas" >nul 2>&1
-if errorlevel 1 goto :try_python
-set "PYEXE=C:\Program Files\Python39\python.exe"
-goto :run
+py -3.12 -c "import sys" >nul 2>&1
+if not errorlevel 1 (
+    set "PYEXE=py"
+    set "PYARGS=-3.12"
+    goto :run
+)
 
-:use_py39
-set "PYEXE=py"
-set "PYARGS=-3.9"
-goto :run
+py -3.11 -c "import sys" >nul 2>&1
+if not errorlevel 1 (
+    set "PYEXE=py"
+    set "PYARGS=-3.11"
+    goto :run
+)
 
-:try_python
-python -c "import aeneas" >nul 2>&1
+py -3.9 -c "import sys" >nul 2>&1
+if not errorlevel 1 (
+    set "PYEXE=py"
+    set "PYARGS=-3.9"
+    goto :run
+)
+
+if exist "C:\Program Files\Python39\python.exe" (
+    set "PYEXE=C:\Program Files\Python39\python.exe"
+    goto :run
+)
+
+python -c "import sys" >nul 2>&1
 if not errorlevel 1 (
     set "PYEXE=python"
     goto :run
 )
 
-python3 -c "import aeneas" >nul 2>&1
+python3 -c "import sys" >nul 2>&1
 if not errorlevel 1 (
     set "PYEXE=python3"
     goto :run
@@ -46,36 +64,23 @@ if not errorlevel 1 (
 goto :missing
 
 :run
-"%PYEXE%" %PYARGS% "%~dp0make_readaloud.py" %*
+"%PYEXE%" %PYARGS% "%~dp0run.py" %*
 set "RC=%ERRORLEVEL%"
 
-echo.
-if not "%RC%"=="0" goto :failed
-echo Finished. The read-aloud EPUB is in the "output" folder.
-echo.
-pause
-exit /b 0
-
-:failed
-echo Something went wrong. Read the messages above.
-if exist "%~dp0_readaloud_work" (
-    echo The _readaloud_work folder was kept so the generated files can be inspected.
+if not "%RC%"=="0" (
+    echo.
+    pause
 )
-echo.
-pause
 exit /b %RC%
 
 :missing
-echo ERROR: no Python with the required packages was found.
+echo ERROR: no usable Python was found.
 echo.
-echo   1. Install Python 3.9 from https://www.python.org/downloads/
-echo      (tick "Add Python to PATH" during installation).
-echo   2. Open a terminal in this folder and run:
+echo   Install Python 3.9 (for the classic pipeline) and/or Python 3.12
+echo   (for Qwen3), then set up the environment described in README.md.
 echo.
-echo         python -m pip install -r requirements.txt
-echo.
-echo   3. Install FFmpeg and eSpeak NG and add both to PATH
-echo      (see README.md for links).
+echo   The web UI itself only needs the standard library, so any
+echo   Python 3.9 or newer is enough to open it.
 echo.
 pause
 exit /b 1

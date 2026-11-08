@@ -4,18 +4,21 @@ ReadAloudMaker has two independent pipelines:
 
 | | v1 (default) | v2 (this document) |
 |---|---|---|
-| Launcher | `run.bat` / `run.sh` | `run2.bat` / `run2.sh` |
+| Launcher | `run.bat --v1` / `run.sh --v1` | `run.bat --v2` / `run.sh --v2` |
+| Web UI | `run.bat` (no argument) offers both | same |
 | Alignment | [aeneas](https://www.readbeyond.it/aeneas/) (DTW) | [Qwen3-ForcedAligner-0.6B](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B) |
 | Packaging | [syncabook](https://github.com/r4victor/syncabook) | built-in `zipfile` + `lxml` |
 | EPUB handling | unpacked and rebuilt | modified at ZIP level |
 | Python | 3.9 | 3.10+ (3.12 recommended) |
 | GPU | not required | strongly recommended |
 
-v1 is unchanged and remains the default. v2 is an additional pipeline for
-maximum synchronization accuracy: Qwen3 predicts a timestamp for every word
-instead of matching an estimated speech signal with DTW. The model card reports
-an average alignment error in the 32–43 ms range depending on language; that is
-a benchmark figure, not a guarantee for every recording.
+Only one launcher exists now. `run.bat` / `run.sh` with no argument opens the
+web UI; add `--v1` or `--v2` to run a pipeline from the terminal. v2 is an
+additional pipeline for maximum synchronization accuracy: Qwen3 predicts a
+timestamp for every word instead of matching an estimated speech signal with
+DTW. The model card reports an average alignment error in the 32–43 ms range
+depending on language; that is a benchmark figure, not a guarantee for every
+recording.
 
 ---
 
@@ -70,9 +73,10 @@ python3.12 -m venv .venv-qwen
 Pick the PyTorch CUDA wheel that matches your driver. The package index above
 is for CUDA 12.4; see <https://pytorch.org/get-started/locally/>.
 
-`run2.bat` and `run2.sh` automatically prefer `.venv-qwen` in the repository
-folder, then a normal `py -3.12` / `python3.12`, then `python`. Only FFmpeg
-(`ffmpeg` + `ffprobe`) has to be on `PATH`.
+`run.py` (called by `run.bat` / `run.sh`) automatically picks the interpreter
+that has the requested engine: it probes `.venv-qwen` in the repository folder,
+`py -3.12` / `python3.12`, then `python`. You do not have to activate the venv.
+Only FFmpeg (`ffmpeg` + `ffprobe`) has to be on `PATH`.
 
 ### 2. Model download
 
@@ -85,14 +89,14 @@ local copy, pass `--model C:\models\Qwen3-ForcedAligner-0.6B`.
 ## Quick start
 
 Put the EPUB and one audio file per chapter in a folder (same rules as v1),
-then:
+then either choose **Qwen3 Forced Aligner** in the web UI, or run:
 
 ```bat
-run2.bat --folder "C:\books\my book"
+run.bat --v2 --folder "C:\books\my book"
 ```
 
 ```bash
-./run2.sh --folder "/books/my book"
+./run.sh --v2 --folder "/books/my book"
 ```
 
 The result is written to `<folder>/output/<title>_readaloud.epub`. Media
@@ -102,7 +106,7 @@ choice.
 ### Check the setup first
 
 ```bat
-run2.bat --folder "C:\books\my book" --dry-run
+run.bat --v2 --folder "C:\books\my book" --dry-run
 ```
 
 `--dry-run` only needs `lxml` and FFmpeg. It parses the EPUB, counts
@@ -116,6 +120,8 @@ structure and overlays are real.
 ---
 
 ## Options
+
+Pass these after `--v2`, e.g. `run.bat --v2 --folder . --device cuda:0`.
 
 | Option | Meaning |
 |---|---|
@@ -223,13 +229,22 @@ python -m unittest discover -s tests -v
 
 They cover EPUB read/write preservation, sentence splitting, nested inline
 markup, token mapping, chunk planning, SMIL/OPF generation, structural
-validation, and an end-to-end build with the deterministic aligner.
+validation, and an end-to-end build with the deterministic aligner. The UI has
+its own tests (`tests/test_ui_jobs.py`, `tests/test_ui_server.py`) which also
+run without any build tool.
 
 ---
 
 ## Package layout
 
 ```text
+run.py               unified launcher (--ui / --v1 / --v2)
+readaloud_ui/        local web UI (standard library HTTP server + static SPA)
+    cli.py           --port / --host / --no-browser
+    server.py        routes, localhost guard, uploads, downloads
+    jobs.py          option validation, subprocess, progress, log parsing
+    environment.py   engine detection across Python interpreters
+    scan.py          EPUB/audio preview without loading the model
 qwen_pipeline/
     __init__.py      version
     __main__.py      python -m qwen_pipeline
