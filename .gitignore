@@ -7,13 +7,18 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv-qwen/
 venv/
 env/
 
 # Tool output and scratch data
 _readaloud_work/
+_qwen_work/
 output/
 out/
+
+# Local notes / chat exports (never commit)
+chat export/
 
 # Never commit books or audio: this repository is code only.
 *.epub

@@ -1,0 +1,16 @@
+# ReadAloudMaker v2 (Qwen3-ForcedAligner) dependencies.
+#
+# Use a separate Python 3.12 environment; v1 (aeneas/syncabook) stays on 3.9.
+#
+#   py -3.12 -m venv .venv-qwen
+#   .venv-qwen\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+#   .venv-qwen\Scripts\python.exe -m pip install -r requirements-qwen.txt
+#
+# Torch is intentionally not pinned here: the correct wheel depends on your
+# CUDA version. Install it first from https://pytorch.org/get-started/locally/.
+
+qwen-asr==0.0.6
+lxml>=4.9
+
+# Pulled in by qwen-asr, listed for clarity:
+#   transformers==4.57.6, accelerate, librosa, soundfile, nagisa, soynlp

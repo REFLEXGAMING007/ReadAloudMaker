@@ -7,9 +7,16 @@ narration plays.
 Put the files in a folder, double-click `run.bat` (Windows) or run `./run.sh`
 (Linux/macOS), and get `output/<book title>_readaloud.epub`.
 
+> **Two pipelines.** `run.bat` / `run.sh` keep the original aeneas + syncabook
+> pipeline. `run2.bat` / `run2.sh` use **Qwen3-ForcedAligner-0.6B** and a
+> built-in EPUB packager instead. The second pipeline is independent, needs
+> Python 3.12 + PyTorch, and is documented in
+> [docs/QWEN3_PIPELINE.md](docs/QWEN3_PIPELINE.md).
+
 ![Python](https://img.shields.io/badge/python-3.9-blue)
 ![EPUB](https://img.shields.io/badge/EPUB-3-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+![Qwen3](https://img.shields.io/badge/v2-Qwen3--ForcedAligner-purple)
 [![tests](https://github.com/REFLEXGAMING007/ReadAloudMaker/actions/workflows/tests.yml/badge.svg)](https://github.com/REFLEXGAMING007/ReadAloudMaker/actions/workflows/tests.yml)
 
 ---
@@ -169,6 +176,34 @@ This unpacks the EPUB, injects IDs, copies/converts the audio, writes the
 metadata and table of contents, and stops. It prints the chapter list and the
 audio list, so it is the fastest way to check that the pairing is right. The
 `_readaloud_work/` folder is kept so you can inspect it.
+
+## Qwen3 pipeline (v2)
+
+The second launcher is independent of aeneas and syncabook:
+
+```bat
+py -3.12 -m venv .venv-qwen
+.venv-qwen\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+.venv-qwen\Scripts\python.exe -m pip install -r requirements-qwen.txt
+run2.bat --folder "C:\books\my book" --dry-run
+run2.bat --folder "C:\books\my book"
+```
+
+```bash
+python3.12 -m venv .venv-qwen
+.venv-qwen/bin/pip install torch
+.venv-qwen/bin/pip install -r requirements-qwen.txt
+./run2.sh --folder "/books/my book" --dry-run
+./run2.sh --folder "/books/my book"
+```
+
+`--dry-run` needs only `lxml` and FFmpeg: it parses the EPUB, plans alignment
+windows and writes `_qwen_work/plan.json` without downloading the model.
+`--fake-aligner` builds a real EPUB with placeholder timings, which is useful
+for checking the packager on a machine without a GPU.
+
+See [docs/QWEN3_PIPELINE.md](docs/QWEN3_PIPELINE.md) for requirements,
+options, accuracy details and GPU memory tips.
 
 ---
 
