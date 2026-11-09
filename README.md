@@ -1,8 +1,31 @@
-# ReadAloudMaker
+<div align="center">
 
-Turn **one EPUB** plus **one audio file per chapter** into an **EPUB 3 with Media
-Overlays** — the "read-aloud" format where the text is highlighted as the
-narration plays.
+<h1>ReadAloudMaker</h1>
+
+<p><strong>Turn an EPUB and one audio file per chapter into a polished read-aloud book.</strong></p>
+
+<p>One EPUB + chapter audio &rarr; <strong>EPUB 3 with Media Overlays</strong>, the format where
+the text highlights as the narration plays. Everything runs on your computer.</p>
+
+<p>
+  <a href="https://github.com/REFLEXGAMING007/ReadAloudMaker/actions/workflows/tests.yml"><img src="https://github.com/REFLEXGAMING007/ReadAloudMaker/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <img src="https://img.shields.io/badge/python-3.9-blue" alt="Python 3.9">
+  <img src="https://img.shields.io/badge/EPUB-3-green" alt="EPUB 3">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
+  <img src="https://img.shields.io/badge/v2-Qwen3--ForcedAligner-purple" alt="Qwen3 ForcedAligner">
+</p>
+
+<p>
+  <a href="#quick-start">Quick start</a> &middot;
+  <a href="#web-ui">Web UI</a> &middot;
+  <a href="#qwen3-pipeline-v2">Qwen3 engine</a> &middot;
+  <a href="#how-it-works">How it works</a> &middot;
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
+<img src="docs/ui.png" alt="ReadAloudMaker local web UI" width="840">
+
+</div>
 
 Double-click `run.bat` (Windows) or run `./run.sh` (Linux/macOS) and the
 **local web UI** opens on <http://127.0.0.1:9459>. Pick a folder, choose an
@@ -21,11 +44,16 @@ engine, press **Build EPUB**, and download `output/<book title>_readaloud.epub`.
 > [docs/QWEN3_PIPELINE.md](docs/QWEN3_PIPELINE.md). The UI detects which
 > engines are installed and only enables the ones that can actually run.
 
-![Python](https://img.shields.io/badge/python-3.9-blue)
-![EPUB](https://img.shields.io/badge/EPUB-3-green)
-![License](https://img.shields.io/badge/license-MIT-blue)
-![Qwen3](https://img.shields.io/badge/v2-Qwen3--ForcedAligner-purple)
-[![tests](https://github.com/REFLEXGAMING007/ReadAloudMaker/actions/workflows/tests.yml/badge.svg)](https://github.com/REFLEXGAMING007/ReadAloudMaker/actions/workflows/tests.yml)
+---
+
+## Highlights
+
+| | |
+|---|---|
+| **Local and private** | A small web UI served from this repository. No accounts, no cloud upload, no Docker. |
+| **Two alignment engines** | Keep the battle-tested **aeneas + syncabook** pipeline, or switch to **Qwen3-ForcedAligner** for word-level timing. |
+| **Picks the best GPU** | `auto` ranks every CUDA card by compute capability and free VRAM. The UI lists them all, and the build log says which one ran. |
+| **Validated output** | The finished EPUB is checked before you get a success message: OPF, media overlays, every SMIL target and MP3 reference must resolve. |
 
 ---
 
@@ -51,8 +79,9 @@ engine, press **Build EPUB**, and download `output/<book title>_readaloud.epub`.
   File names do **not** need to match the EPUB's internal names — only the
   count has to match.
 - Converts non-MP3 audio to MP3 automatically with FFmpeg.
-- Aligns each chapter with [aeneas](https://www.readbeyond.it/aeneas/) and
-  packages the result with [syncabook](https://github.com/r4victor/syncabook).
+- Aligns each chapter with the engine you choose: **Qwen3-ForcedAligner** for
+  word-level timing, or the original [aeneas](https://www.readbeyond.it/aeneas/)
+  + [syncabook](https://github.com/r4victor/syncabook) pipeline.
 - Carries over the cover, title, author, language, and per-chapter titles.
 - Validates the finished EPUB before telling you it worked: OPF is valid UTF-8,
   every media overlay exists, every SMIL `<par>` points at a real fragment and a
@@ -244,6 +273,9 @@ and never leaves this computer.
 - **Engine cards** show which pipelines are ready. Detection asks each Python
   interpreter whether `aeneas`, `lxml`, `torch` and `qwen_asr` *exist*; it does
   not import torch, so the page opens in about a second.
+- **Device picker** lists every detected GPU and remembers your choice. `auto`
+  picks the best card instead of blindly using `cuda:0`; the build log prints
+  the exact index it loaded.
 - **Scan** reads the EPUB spine and lists the chapter count, sentence count and
   audio files before anything is built, and warns when the counts do not match.
 - **Drag and drop** copies the EPUB and audio into a temporary folder
