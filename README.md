@@ -17,8 +17,9 @@ the text highlights as the narration plays. Everything runs on your computer.</p
 
 <p>
   <a href="#quick-start">Quick start</a> &middot;
+  <a href="#choosing-an-alignment-engine">Engines</a> &middot;
   <a href="#web-ui">Web UI</a> &middot;
-  <a href="#qwen3-pipeline-v2">Qwen3 engine</a> &middot;
+  <a href="#qwen3-pipeline-v2">Qwen3 setup</a> &middot;
   <a href="#how-it-works">How it works</a> &middot;
   <a href="#troubleshooting">Troubleshooting</a>
 </p>
@@ -91,6 +92,75 @@ engine, press **Build EPUB**, and download `output/<book title>_readaloud.epub`.
 Works with any text-based EPUB whose chapter count matches the audio count.
 It does not split a single full-book audiobook into chapters — see
 [Limitations](#limitations).
+
+---
+
+## Choosing an alignment engine
+
+Both engines produce the same EPUB 3 with Media Overlays. The classic pipeline
+highlights the EPUB's spoken blocks (usually whole paragraphs), while Qwen3
+splits blocks into sentences and places those sentence boundaries from
+word-level timestamps. Pick one per build in the UI, or with `--v1` / `--v2` on
+the command line.
+
+**Rule of thumb:** Classic is the low-friction choice on CPU-only or older
+machines; Qwen3 is worth the setup when you have a CUDA GPU and want tighter
+sync.
+
+### Classic: aeneas + syncabook
+
+**Pros**
+
+- **CPU-only.** No GPU, CUDA driver or PyTorch install.
+- **Mature and predictable.** The original pipeline is battle-tested, and there
+  is no model to download or load before the first chapter starts.
+- **Modest footprint.** Python 3.9, FFmpeg and eSpeak NG, plus the packages in
+  `requirements.txt`.
+- **Small overlays.** Paragraph-level highlights mean fewer SMIL entries and a
+  simpler timeline.
+
+**Cons**
+
+- **Paragraph-level highlights.** A long paragraph stays highlighted as one
+  block, so the sync can visibly lag inside it.
+- **DTW is an estimate.** aeneas matches the narration against an eSpeak
+  rendering, so heavy accents, music, background noise or long pauses can pull
+  the boundaries off.
+- **Pinned to Python 3.9.** aeneas 1.7.3 ships prebuilt C extensions for 3.9;
+  newer Python versions often fail to build them.
+- **Needs eSpeak NG.** One more system program on `PATH` in addition to FFmpeg.
+- **Rebuilds the EPUB.** Untouched fonts, images and CSS are not guaranteed to
+  survive byte for byte.
+
+### Qwen3: Qwen3-ForcedAligner-0.6B
+
+**Pros**
+
+- **Word-level timestamps, sentence-level highlights.** Blocks are split at
+  sentence boundaries and each boundary comes from aligned words instead of a
+  DTW estimate. The model card reports 32–43 ms average error depending on
+  language.
+- **Built for long chapters.** Windowing, a 30-second safety tail and monotonic
+  clamping keep a chapter aligned without letting errors accumulate.
+- **No eSpeak.** The model aligns the narration directly to the EPUB text, so
+  pronunciation is less of a problem.
+- **Surgical packaging.** Fonts, images, CSS and the cover are copied byte for
+  byte; only chapters, the package document and the new overlays change.
+- **Picks the GPU for you.** `auto` chooses the best card and falls back to CPU.
+
+**Cons**
+
+- **Much larger setup.** Python 3.10+ (3.12 recommended), PyTorch, qwen-asr and
+  a ~1.2 GB model download on first use.
+- **GPU strongly recommended.** CPU alignment is slow, and a CUDA card needs
+  roughly 2.5 GB of free VRAM.
+- **More moving parts.** The PyTorch wheel must match the driver, and dtype
+  selection plus the 180-second alignment limit add failure modes the classic
+  pipeline does not have.
+- **Stricter by design.** A chapter that falls below 98% coverage is rejected
+  rather than packaged with drifting timings, so a bad pairing needs a retry.
+- **Newer and less battle-tested.** Fewer books have gone through this pipeline
+  than through aeneas + syncabook.
 
 ---
 
@@ -208,7 +278,8 @@ syncabook -h
 
 4. Open `output/<book title>_readaloud.epub` in a reader that supports Media
    Overlays. **Thorium Reader** is the easiest choice on Windows, Linux and
-   macOS. Press play and the current sentence is highlighted.
+   macOS. Press play and the current block (or sentence with Qwen3) is
+   highlighted.
 
 > Calibre's viewer and most generic EPUB readers do **not** implement Media
 > Overlays. An EPUB that looks fine there can still be a perfectly good
