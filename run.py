@@ -70,6 +70,7 @@ def _run_cli(mode, arguments):
     environment_variables["PYTHONIOENCODING"] = "utf-8"
     environment_variables["PYTHONUNBUFFERED"] = "1"
     environment_variables.setdefault("PYTHONUTF8", "1")
+    environment_variables.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 
     print("[readaloud] engine: %s (%s)" % (engine.get("name"), engine.get("pythonLabel")))
     try:

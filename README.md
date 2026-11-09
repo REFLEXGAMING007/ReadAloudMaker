@@ -226,6 +226,11 @@ windows and writes `_qwen_work/plan.json` without downloading the model.
 `--fake-aligner` builds a real EPUB with placeholder timings, which is useful
 for checking the packager on a machine without a GPU.
 
+`--device auto` (the UI default) picks the best CUDA card, not blindly
+`cuda:0`: it ranks compute capability, then free VRAM, and skips cards with too
+little memory. The UI lists every detected GPU so you can pin one. The build
+log prints the exact card it chose.
+
 See [docs/QWEN3_PIPELINE.md](docs/QWEN3_PIPELINE.md) for requirements,
 options, accuracy details and GPU memory tips.
 

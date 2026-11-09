@@ -43,6 +43,124 @@ SUPPORTED_LANGUAGES = (
 
 MODEL_ID = "Qwen/Qwen3-ForcedAligner-0.6B"
 
+# A device needs at least this much free VRAM to be a useful `auto` candidate;
+# below it the model plus a 150 s audio window will not fit.
+MIN_FREE_VRAM = int(2.5 * 1024 ** 3)
+
+
+def gpu_snapshot(torch):
+    """Return one dict per CUDA device, or ``[]`` when CUDA is unusable."""
+    gpus = []
+    try:
+        if not torch.cuda.is_available():
+            return gpus
+        count = torch.cuda.device_count()
+    except Exception:
+        return gpus
+
+    for index in range(count):
+        gpu = {
+            "index": index,
+            "name": "cuda:%d" % index,
+            "capability": 0,
+            "total_memory": 0,
+            "free_memory": 0,
+        }
+        try:
+            gpu["name"] = str(torch.cuda.get_device_name(index))
+        except Exception:
+            pass
+        try:
+            major, minor = torch.cuda.get_device_capability(index)
+            gpu["capability"] = int(major) * 10 + int(minor)
+        except Exception:
+            pass
+        try:
+            gpu["total_memory"] = int(torch.cuda.get_device_properties(index).total_memory)
+        except Exception:
+            pass
+        try:
+            gpu["free_memory"] = int(torch.cuda.mem_get_info(index)[0])
+        except Exception:
+            gpu["free_memory"] = gpu["total_memory"]
+        gpus.append(gpu)
+    return gpus
+
+
+def _gigabytes(value):
+    return "%.1f GB" % (float(value or 0) / (1024.0 ** 3))
+
+
+def select_device(torch, requested="auto"):
+    """Resolve ``--device`` to ``(device, reason)``.
+
+    ``auto`` picks the *most capable* CUDA device that still has room, instead
+    of blindly using ``cuda:0``. Ranking is compute capability first, then free
+    VRAM, then total VRAM: a newer architecture runs the model faster even when
+    an older card has a little more memory, while a card that is already full
+    is skipped entirely.
+    """
+    requested = (requested or "auto").strip() or "auto"
+    lowered = requested.lower()
+    gpus = gpu_snapshot(torch)
+
+    if lowered == "cpu":
+        return "cpu", "requested"
+
+    if lowered != "auto":
+        if lowered == "cuda":
+            index = 0
+        elif lowered.startswith("cuda:"):
+            try:
+                index = int(lowered.split(":", 1)[1])
+            except ValueError:
+                raise PipelineError(
+                    "--device %r is not a valid CUDA index" % requested
+                )
+            if index < 0:
+                raise PipelineError(
+                    "--device %r is not a valid CUDA index" % requested
+                )
+        else:
+            raise PipelineError(
+                "--device must be auto, cpu, or cuda / cuda:N (got %r)" % requested
+            )
+        if not gpus:
+            raise PipelineError(
+                "CUDA is not available in this Python, so --device %s cannot be used."
+                % requested,
+                hint="Install a CUDA build of PyTorch, or pass --device cpu.",
+            )
+        if index >= len(gpus):
+            raise PipelineError(
+                "cuda:%d does not exist; this machine has %d CUDA device(s):\n  %s"
+                % (index, len(gpus),
+                   "\n  ".join("cuda:%d  %s  %s"
+                               % (gpu["index"], gpu["name"],
+                                  _gigabytes(gpu["total_memory"]))
+                               for gpu in gpus)),
+                hint="Pick one of the devices above, or use --device auto.",
+            )
+        return "cuda:%d" % index, "requested"
+
+    if not gpus:
+        return "cpu", "no CUDA device"
+
+    usable = [gpu for gpu in gpus if gpu["free_memory"] >= MIN_FREE_VRAM]
+    skipped = len(gpus) - len(usable)
+    candidates = usable or gpus
+    best = max(candidates, key=lambda gpu: (gpu["capability"],
+                                            gpu["free_memory"],
+                                            gpu["total_memory"]))
+    reason = "%s, %s free of %s" % (best["name"], _gigabytes(best["free_memory"]),
+                                    _gigabytes(best["total_memory"]))
+    if skipped:
+        reason += "; %d device(s) skipped for low free memory" % skipped
+    if len(gpus) > 1:
+        reason += "; best of %d" % len(gpus)
+    return "cuda:%d" % best["index"], reason
+
+
 
 @dataclass
 class Token:
@@ -86,6 +204,7 @@ class QwenAligner(object):
         self._torch = None
         self.device = None
         self.dtype = None
+        self.device_reason = ""
 
     # -- loading -----------------------------------------------------------
 
@@ -134,8 +253,13 @@ class QwenAligner(object):
             )
 
         device = self.requested_device
-        if device in (None, "auto"):
-            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        device, reason = select_device(torch, device)
+        self.device_reason = reason
+        if device.startswith("cuda"):
+            try:
+                torch.cuda.set_device(device)
+            except Exception:
+                pass
 
         dtype = self._resolve_dtype(torch, device)
 
@@ -166,6 +290,17 @@ class QwenAligner(object):
         self._model = model
         self.device = device
         self.dtype = dtype
+
+    def describe_device(self):
+        """Human-readable ``cuda:1 · float16 (GTX 1060, 5.8 GB free)``."""
+        if not self.device:
+            return self.requested_device or "auto"
+        text = self.device
+        if self.dtype is not None:
+            text += " · " + str(self.dtype).replace("torch.", "")
+        if self.device_reason and self.device_reason != "requested":
+            text += " (" + self.device_reason + ")"
+        return text
 
     # -- inference ---------------------------------------------------------
 

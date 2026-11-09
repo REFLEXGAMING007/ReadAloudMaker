@@ -121,6 +121,51 @@
     return state.engines.find((engine) => engine.key === key) || null;
   }
 
+  function gpuList() {
+    return (state.env && state.env.gpus) || [];
+  }
+
+  function shortGpuName(name) {
+    return String(name || "GPU").replace(/^NVIDIA\s+(GeForce\s+)?/i, "").trim();
+  }
+
+  function recommendedGpu() {
+    if (!state.env || state.env.recommendedGpu == null) return null;
+    return gpuList().find((gpu) => gpu.index === state.env.recommendedGpu) || null;
+  }
+
+  function gpuSummary() {
+    const gpus = gpuList();
+    if (!gpus.length) return state.env && state.env.gpu ? state.env.gpu : "";
+    const best = recommendedGpu() || gpus[0];
+    const extra = gpus.length > 1 ? " (best of " + gpus.length + ")" : "";
+    return "auto · " + shortGpuName(best.name) + extra;
+  }
+
+  function renderDevices() {
+    const select = $("device");
+    if (!select) return;
+    const gpus = gpuList();
+    const best = recommendedGpu();
+    const current = select.value || "auto";
+    const options = ['<option value="auto">auto · best GPU</option>'];
+    gpus.forEach((gpu) => {
+      // Tag the whole card class: `auto` may pick either of two identical cards.
+      const tag = best && gpu.computeCap === best.computeCap &&
+        gpu.totalMemory === best.totalMemory ? " · recommended" : "";
+      const label = "cuda:" + gpu.index + " · " + shortGpuName(gpu.name) + " · " +
+        fmtSize(gpu.totalMemory) + tag;
+      options.push('<option value="cuda:' + gpu.index + '">' + esc(label) + "</option>");
+    });
+    options.push('<option value="cpu">cpu (slow)</option>');
+    select.innerHTML = options.join("");
+    const values = Array.from(select.options).map((option) => option.value);
+    select.value = values.indexOf(current) === -1 ? "auto" : current;
+    select.title = state.env && state.env.cudaVisible
+      ? "CUDA_VISIBLE_DEVICES=" + state.env.cudaVisible
+      : "";
+  }
+
   function renderEngines() {
     const container = $("engines");
     if (!state.engines.length) {
@@ -175,7 +220,7 @@
     $("runEngine").textContent = engine.key === "qwen"
       ? "Qwen3 · word-level"
       : "aeneas + syncabook";
-    $("advancedTag").textContent = engine.key === "qwen" ? "word-level" : "classic";
+    $("advancedTag").textContent = engine.key === "qwen" ? "word level accuracy" : "classic";
     $("qwenOptions").hidden = engine.key !== "qwen";
     $("classicOptions").hidden = engine.key !== "classic";
 
@@ -191,8 +236,8 @@
     updateRangeLabels();
 
     if (engine.available) {
-      const gpu = engine.key === "qwen" && state.env && state.env.gpu ? " · " + state.env.gpu : "";
-      $("engineHint").textContent = engine.pythonLabel + gpu;
+      const gpu = engine.key === "qwen" ? gpuSummary() : "";
+      $("engineHint").textContent = engine.pythonLabel + (gpu ? " · " + gpu : "");
     } else {
       $("engineHint").textContent = "Missing: " + ((engine.missing || []).join(", ") || "dependencies") +
         " — open “How it works” for setup steps.";
@@ -212,6 +257,7 @@
       state.env = await api("/api/env");
       state.engines = state.env.engines || [];
       $("hostPill").innerHTML = '<i></i> local · ' + (state.env.port || 9459);
+      renderDevices();
       renderEngines();
 
       const preferred = localStorage.getItem("readaloud.engine") || "qwen";
@@ -221,7 +267,9 @@
       }
       if (chosen) selectEngine(chosen.key);
 
-      if (state.env.gpu) {
+      if (state.env.gpus && state.env.gpus.length) {
+        $("footEngine").textContent = gpuSummary() + " · classic available for compatibility";
+      } else if (state.env.gpu) {
         $("footEngine").textContent = state.env.gpu + " · classic available for compatibility";
       } else if (state.engines.some((engine) => engine.key === "qwen" && engine.available)) {
         $("footEngine").textContent = "Qwen3 ready · classic available for compatibility";
@@ -240,6 +288,10 @@
     if (folder) $("folder").value = folder;
     const out = localStorage.getItem("readaloud.out");
     if (out) $("out").value = out;
+    const device = localStorage.getItem("readaloud.device");
+    if (device && Array.from($("device").options).some((option) => option.value === device)) {
+      $("device").value = device;
+    }
     const noise = localStorage.getItem("readaloud.noise");
     if (noise === "1") {
       $("showNoise").checked = true;
@@ -253,6 +305,7 @@
     localStorage.setItem("readaloud.folder", $("folder").value.trim());
     localStorage.setItem("readaloud.out", $("out").value.trim());
     localStorage.setItem("readaloud.engine", state.engine);
+    localStorage.setItem("readaloud.device", $("device").value);
     localStorage.setItem("readaloud.noise", $("showNoise").checked ? "1" : "0");
   }
 
@@ -754,6 +807,7 @@
       if (event.key === "Enter") { event.preventDefault(); scan(true); }
     });
     $("out").addEventListener("input", () => { updateOutputPreview(); savePrefs(); });
+    $("device").addEventListener("change", () => savePrefs());
     $("exclude").addEventListener("change", () => scan(false));
     $("epubSelect").addEventListener("change", (event) => { state.epub = event.target.value; });
 

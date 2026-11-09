@@ -297,6 +297,8 @@ def build(options, aligner=None):
                 )
                 log("loading %s (device=%s) ..." % (options.model, options.device))
                 aligner.load()
+                if hasattr(aligner, "describe_device"):
+                    log("device:   " + aligner.describe_device())
 
         for chapter in chapters:
             _align_chapter(chapter, aligner, language, options)

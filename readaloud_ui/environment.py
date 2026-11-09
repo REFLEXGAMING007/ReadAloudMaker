@@ -162,25 +162,125 @@ def _tool_paths():
     }
 
 
-def gpu_name():
-    """Best-effort GPU label via nvidia-smi (does not import torch)."""
+def _parse_gpus(text):
+    """Parse ``nvidia-smi --format=csv,noheader,nounits`` rows."""
+    gpus = []
+    for line in (text or "").splitlines():
+        parts = [part.strip() for part in line.split(",")]
+        if len(parts) < 4:
+            continue
+        try:
+            index = int(parts[0])
+        except ValueError:
+            continue
+        try:
+            total = int(float(parts[2])) * 1024 * 1024
+        except ValueError:
+            total = 0
+        try:
+            free = int(float(parts[3])) * 1024 * 1024
+        except ValueError:
+            free = total
+        capability = parts[4] if len(parts) > 4 else ""
+        gpus.append({
+            "index": index,
+            "name": parts[1] or ("cuda:%d" % index),
+            "totalMemory": total,
+            "freeMemory": free,
+            "computeCap": capability,
+            "driver": parts[5] if len(parts) > 5 else "",
+        })
+    return gpus
+
+
+QUERY_FIELDS = "index,name,memory.total,memory.free,compute_cap,driver_version"
+
+
+def _visible_gpus(gpus):
+    """Reorder/filter to what torch will actually expose.
+
+    With ``CUDA_VISIBLE_DEVICES=1,2`` torch calls the cards ``cuda:0`` and
+    ``cuda:1``, so the UI must present them the same way or every index the
+    user picks would be off by one.
+    """
+    visible = (os.environ.get("CUDA_VISIBLE_DEVICES") or "").strip()
+    if not visible:
+        return gpus
+    if visible == "-1":
+        return []
+    wanted = []
+    for part in visible.split(","):
+        part = part.strip()
+        if part.isdigit():
+            wanted.append(int(part))
+    if not wanted:
+        return gpus  # UUID or MIG identifiers: leave the list untouched
+
+    by_index = {gpu["index"]: gpu for gpu in gpus}
+    ordered = []
+    for position, index in enumerate(wanted):
+        gpu = by_index.get(index)
+        if gpu is None:
+            continue
+        entry = dict(gpu)
+        entry["physicalIndex"] = gpu["index"]
+        entry["index"] = position
+        ordered.append(entry)
+    return ordered or gpus
+
+
+def gpu_devices():
+    """Every visible NVIDIA GPU as reported by nvidia-smi (never imports torch)."""
     exe = shutil.which("nvidia-smi")
     if not exe:
-        return ""
+        return []
+    environment = os.environ.copy()
+    # nvidia-smi already defaults to PCI order, but pin it so the indices match
+    # the ones torch reports (jobs.py sets the same variable for builds).
+    environment["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     try:
         completed = subprocess.run(
-            [exe, "--query-gpu=name", "--format=csv,noheader"],
+            [exe, "--query-gpu=" + QUERY_FIELDS,
+             "--format=csv,noheader,nounits"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             timeout=8,
+            env=environment,
             creationflags=_no_window_flags(),
         )
     except (OSError, subprocess.SubprocessError):
-        return ""
+        return []
     if completed.returncode != 0:
-        return ""
-    lines = completed.stdout.decode("utf-8", "replace").strip().splitlines()
-    return lines[0].strip() if lines else ""
+        return []
+    return _visible_gpus(_parse_gpus(completed.stdout.decode("utf-8", "replace")))
+
+
+def gpu_name(gpus=None):
+    """Label of the first GPU, kept for the older single-GPU payload field."""
+    if gpus is None:
+        gpus = gpu_devices()
+    return gpus[0]["name"] if gpus else ""
+
+
+def recommended_gpu(gpus):
+    """Index of the best *class* of card, used for the UI's recommendation.
+
+    Ranked by compute capability, then total VRAM. Free memory is deliberately
+    not part of this: between two identical cards, ``auto`` takes whichever has
+    more free VRAM at load time, so the UI promises a class of card (and the
+    build log reports the exact index) instead of predicting one.
+    """
+    if not gpus:
+        return None
+
+    def rank(gpu):
+        capability = 0
+        for part in str(gpu.get("computeCap") or "").split("."):
+            if part.isdigit():
+                capability = capability * 10 + int(part)
+        return (capability, gpu.get("totalMemory") or 0)
+
+    return max(gpus, key=rank)["index"]
 
 
 def _python_label(candidate):
@@ -233,7 +333,16 @@ def _classic_engine(candidates, tools):
     }
 
 
-def _qwen_engine(candidates, tools, gpu):
+def _gpu_best_label(gpus, index):
+    """Name of the recommended card *class* (no index: ``auto`` decides that)."""
+    for gpu in gpus:
+        if gpu.get("index") == index:
+            return "best GPU · %s" % (gpu.get("name") or "GPU")
+    return ""
+
+
+def _qwen_engine(candidates, tools, gpus=None, recommended=None):
+    gpus = gpus or []
     chosen = None
     for candidate in candidates:
         modules = candidate.modules
@@ -247,7 +356,8 @@ def _qwen_engine(candidates, tools, gpu):
     if not tools["ffmpeg"] or not tools["ffprobe"]:
         missing.append("FFmpeg + ffprobe")
 
-    notes = ["~32–43 ms average error", "GPU recommended" if not gpu else gpu]
+    label = _gpu_best_label(gpus, recommended)
+    notes = ["~32–43 ms average error", label or "GPU recommended"]
 
     return {
         "key": "qwen",
@@ -291,10 +401,11 @@ def detect(force=False):
 
     candidates = probe_candidates()
     tools = _tool_paths()
-    gpu = gpu_name()
+    gpus = gpu_devices()
+    recommended = recommended_gpu(gpus)
 
     engines = [
-        _qwen_engine(candidates, tools, gpu),
+        _qwen_engine(candidates, tools, gpus, recommended),
         _classic_engine(candidates, tools),
     ]
 
@@ -308,7 +419,10 @@ def detect(force=False):
             "ffprobe": tools["ffprobe"] or "",
             "espeak": tools["espeak"] or "",
         },
-        "gpu": gpu,
+        "gpu": gpu_name(gpus),
+        "gpus": gpus,
+        "recommendedGpu": recommended,
+        "cudaVisible": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
         "engines": engines,
         "candidates": [
             {

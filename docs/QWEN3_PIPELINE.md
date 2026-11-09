@@ -133,7 +133,7 @@ Pass these after `--v2`, e.g. `run.bat --v2 --folder . --device cuda:0`.
 | `--exclude REGEX` | Skip matching EPUB documents. Default skips `cover`, `nav`, `toc`, `titlepage`. Pass `""` to keep everything. |
 | `--max-chunk-seconds N` | Planned narration length per alignment pass (default 150). Maximum 170: with the safety tail, no pass exceeds qwen-asr's 180-second audio limit. |
 | `--min-coverage F` | Reject a chapter when less than this fraction of characters align (default 0.98). |
-| `--device DEV` | `auto`, `cpu`, `cuda:0`, `cuda:1`, … |
+| `--device DEV` | `auto`, `cpu`, `cuda:0`, `cuda:N`, … `auto` picks the best card (see below). |
 | `--dtype TYPE` | `auto`, `bfloat16`, `float16`, `float32`. `auto` picks bfloat16 on Ampere+ and float16 on older NVIDIA cards. |
 | `--model ID` | Hugging Face id or local folder. |
 | `--compile` | Try `torch.compile` for a slower first run and faster later runs. |
@@ -145,6 +145,27 @@ Pass these after `--v2`, e.g. `run.bat --v2 --folder . --device cuda:0`.
 
 Supported languages: Chinese, English, Cantonese, French, German, Italian,
 Japanese, Korean, Portuguese, Russian, Spanish.
+
+### Choosing the GPU
+
+`--device auto` (the default) ranks every CUDA device by compute capability,
+then free VRAM, then total VRAM, and skips any card with less than 2.5 GB free.
+It is not "cuda:0": on a machine with a GTX 1050 Ti in slot 0 and two GTX 1060s
+in slots 1 and 2, `auto` uses a 1060.
+
+The first log line of a real build reports what it actually chose:
+
+```text
+[readaloud-qwen] loading Qwen/Qwen3-ForcedAligner-0.6B (device=auto) ...
+[readaloud-qwen] device:   cuda:1 · torch.float16 (NVIDIA GeForce GTX 1060 6GB, 5.1 GB free of 6.0 GB; best of 3)
+```
+
+Builds run with `CUDA_DEVICE_ORDER=PCI_BUS_ID`, so `cuda:N` means the same card
+in the UI, in `nvidia-smi`, and in the log. `CUDA_VISIBLE_DEVICES` is honoured:
+the UI renumbers the visible cards from zero exactly as torch does.
+
+Pin a specific card with `--device cuda:2`. An index that does not exist is
+rejected before the model loads, with the real device list in the message.
 
 ---
 

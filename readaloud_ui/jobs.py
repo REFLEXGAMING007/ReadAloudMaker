@@ -303,6 +303,9 @@ class Job:
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONUNBUFFERED"] = "1"
         env.setdefault("PYTHONUTF8", "1")
+        # Keep torch's CUDA indices in the same order nvidia-smi reports, so
+        # "cuda:1 · GTX 1060" in the UI is really that card.
+        env.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 
         kwargs = {}
         if IS_WINDOWS:

@@ -18,7 +18,16 @@ def fake_detector(force=False):
         "platform": "test",
         "runningPython": "3.9",
         "ffmpeg": {"ok": True, "ffmpeg": "ffmpeg", "ffprobe": "ffprobe", "espeak": ""},
-        "gpu": "",
+        "gpu": "NVIDIA GeForce GTX 1050 Ti",
+        "gpus": [
+            {"index": 0, "name": "NVIDIA GeForce GTX 1050 Ti",
+             "totalMemory": 4096 * 1024 * 1024, "freeMemory": 3100 * 1024 * 1024,
+             "computeCap": "6.1", "driver": "582.16"},
+            {"index": 1, "name": "NVIDIA GeForce GTX 1060 6GB",
+             "totalMemory": 6144 * 1024 * 1024, "freeMemory": 5700 * 1024 * 1024,
+             "computeCap": "6.1", "driver": "582.16"},
+        ],
+        "recommendedGpu": 1,
         "engines": [
             {
                 "key": "qwen",
@@ -118,6 +127,19 @@ class UiServerTests(unittest.TestCase):
         self.assertEqual(payload["port"], self.port)
         keys = [engine["key"] for engine in payload["engines"]]
         self.assertEqual(keys, ["qwen", "classic"])
+
+    def test_env_lists_every_gpu(self):
+        status, payload = self.json_request("GET", "/api/env")
+        self.assertEqual(status, 200)
+        self.assertEqual([gpu["index"] for gpu in payload["gpus"]], [0, 1])
+        self.assertEqual(payload["recommendedGpu"], 1)
+
+    def test_ui_has_no_hardcoded_device_list(self):
+        status, data, _ = self.request("GET", "/assets/app.js")
+        self.assertEqual(status, 200)
+        self.assertIn(b"renderDevices", data)
+        status, data, _ = self.request("GET", "/")
+        self.assertNotIn(b'value="cuda:1"', data)
 
     def test_non_local_host_is_rejected(self):
         status, _, _ = self.request("GET", "/api/env", headers={"Host": "evil.example"})
